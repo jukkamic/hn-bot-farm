@@ -1,0 +1,17 @@
+{
+  "name": "HN Bot Farm & Claude Sandbox",
+  "image": "mcr.microsoft.com/devcontainers/python:3.13",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts"
+    }
+  },
+  "postCreateCommand": "npm install -g @anthropic-ai/claude-code && python -m venv .venv && .venv/bin/python -m pip install --upgrade pip",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python"
+      }
+    }
+  }
+}

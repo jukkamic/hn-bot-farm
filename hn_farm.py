@@ -5,62 +5,75 @@ import os
 import json
 import urllib.request
 from dotenv import load_dotenv
-from crewai import Agent, Task, Crew
-from crewai.tools import tool
+from pydantic import BaseModel, Field
+from crewai import Agent, Task, Crew, LLM
+from crewai.tools import BaseTool
 from crewai_tools import FileWriterTool
 
-# Load environment variables from .env file
 load_dotenv()
 
+# --- LLM Provider Configuration ---
 providers = {
     "zai": {
         "api_key": os.getenv("ZAI_API_KEY", ""),
         "base_url": "https://api.z.ai/api/paas/v4/",
-        "agent_model": "openai/glm-5",
-        "memory_model": "glm-5"  # What CrewAI's memory system expects
+        "model": "openai/glm-5"
     },
     "groq": {
         "api_key": os.getenv("GROQ_API_KEY", ""),
-        "base_url": "https://api.groq.com/openai/v1",
-        # Switched to 3.1 for stable tool calling!
-        "agent_model": "groq/llama-3.1-70b-versatile",
-        "memory_model": "llama-3.1-70b-versatile"
-    }}
+        "base_url": "https://api.groq.com/openai/v1/",
+        "model": "groq/llama-3.3-70b-versatile"
+    }
+}
 
-# --- 2. THE ONE-LINER SWITCH ---
-# Just change "zai" to "groq" here to instantly swap your entire infrastructure!
+# --- THE ONE-LINER SWITCH ---
+# Change "zai" to "groq" here to instantly swap providers!
+active_provider = providers["groq"]
 
-llm_config = providers["zai"]
+# Set environment variables for LiteLLM (required by CrewAI for custom providers)
+os.environ["OPENAI_API_KEY"] = active_provider["api_key"]
+os.environ["OPENAI_API_BASE"] = active_provider["base_url"]
+
+# Create LLM instance
+llm = LLM(model=active_provider["model"])
 
 
-@tool("Fetch HN Stories")
-def fetch_hn_stories() -> str:
-    """
-    Fetch the top 5 current stories from Hacker News.
+# --- Custom Tool with explicit schema (fixes Groq compatibility) ---
+class FetchHNStoriesInput(BaseModel):
+    """Input schema for fetch_hn_stories."""
+    query: str = Field(default="", description="No parameters needed - leave empty")
 
-    Returns:
-        A JSON string containing the top 5 stories with id, title, and url.
-    """
-    def fetch_json(url):
-        with urllib.request.urlopen(url) as response:
-            return json.loads(response.read().decode('utf-8'))
 
-    # Get top story IDs
-    top_stories_url = "https://hacker-news.firebaseio.com/v0/topstories.json"
-    story_ids = fetch_json(top_stories_url)
+class FetchHNStoriesTool(BaseTool):
+    name: str = "fetch_hn_stories"
+    description: str = "Fetch the top 5 current stories from Hacker News. Returns a JSON string with id, title, and url for each story."
+    args_schema: type[BaseModel] = FetchHNStoriesInput
 
-    # Fetch details for top 5 stories
-    stories = []
-    for story_id in story_ids[:5]:
-        story_url = f"https://hacker-news.firebaseio.com/v0/item/{story_id}.json"
-        story = fetch_json(story_url)
-        stories.append({
-            'id': story_id,
-            'title': story.get('title', 'No title'),
-            'url': story.get('url', 'No URL')
-        })
+    def _run(self, query: str = "") -> str:
+        """Fetch the top 5 current stories from Hacker News."""
+        def fetch_json(url):
+            with urllib.request.urlopen(url) as response:
+                return json.loads(response.read().decode('utf-8'))
 
-    return json.dumps(stories, indent=2)
+        # Get top story IDs
+        top_stories_url = "https://hacker-news.firebaseio.com/v0/topstories.json"
+        story_ids = fetch_json(top_stories_url)
+
+        # Fetch details for top 5 stories
+        stories = []
+        for story_id in story_ids[:5]:
+            story_url = f"https://hacker-news.firebaseio.com/v0/item/{story_id}.json"
+            story = fetch_json(story_url)
+            stories.append({
+                'id': story_id,
+                'title': story.get('title', 'No title'),
+                'url': story.get('url', 'No URL')
+            })
+
+        return json.dumps(stories, indent=2)
+
+
+fetch_hn_stories = FetchHNStoriesTool()
 
 
 # Initialize tools
@@ -75,8 +88,8 @@ tech_researcher = Agent(
         "the most relevant and trending tech news from Hacker News."
     ),
     tools=[fetch_hn_stories],
-    verbose=True,
-    **llm_config
+    llm=llm,
+    verbose=True
 )
 
 newsletter_editor = Agent(
@@ -87,8 +100,8 @@ newsletter_editor = Agent(
         "into beautifully formatted, easy-to-read content for tech enthusiasts."
     ),
     tools=[file_writer_tool],
-    verbose=True,
-    **llm_config
+    llm=llm,
+    verbose=True
 )
 
 # Define Tasks
