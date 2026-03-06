@@ -1,20 +1,35 @@
 #!/usr/bin/env python3
 """CrewAI application to fetch Hacker News stories and generate a newsletter."""
 
+import os
 import json
 import urllib.request
+from dotenv import load_dotenv
 from crewai import Agent, Task, Crew, tool
 from crewai_tools import FileWriterTool
 
-# ============================================================================
-# PASTE YOUR CUSTOM GROQ/LLM CONFIGURATION DICTIONARY HERE
-# Example:
-# llm_config = {
-#     "model": "groq/llama-3.1-70b-versatile",
-#     "api_key": "your-api-key",
-# }
-# ============================================================================
-llm_config = {}
+# Load environment variables from .env file
+load_dotenv()
+
+providers = {
+    "zai": {
+        "api_key": os.getenv("ZAI_API_KEY", ""),
+        "base_url": "https://api.z.ai/api/paas/v4/",
+        "agent_model": "openai/glm-5",
+        "memory_model": "glm-5"  # What CrewAI's memory system expects
+    },
+    "groq": {
+        "api_key": os.getenv("GROQ_API_KEY", ""),
+        "base_url": "https://api.groq.com/openai/v1",
+        # Switched to 3.1 for stable tool calling!
+        "agent_model": "groq/llama-3.1-70b-versatile",
+        "memory_model": "llama-3.1-70b-versatile"
+    }}
+
+# --- 2. THE ONE-LINER SWITCH ---
+# Just change "zai" to "groq" here to instantly swap your entire infrastructure!
+
+llm_config = providers["zai"]
 
 
 @tool("Fetch HN Stories")
