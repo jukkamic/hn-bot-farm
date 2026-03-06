@@ -5,7 +5,8 @@ import os
 import json
 import urllib.request
 from dotenv import load_dotenv
-from crewai import Agent, Task, Crew, tool
+from crewai import Agent, Task, Crew
+from crewai.tools import tool
 from crewai_tools import FileWriterTool
 
 # Load environment variables from .env file
