@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 /workspaces/hn-bot-farm/fetch_hn.py)",
+      "Bash(/workspaces/hn-bot-farm/.venv/bin/python /workspaces/hn-bot-farm/hn_farm.py 2>&1)",
+      "Bash(python hn_farm.py)",
+      "Bash(ls -la docs/brainstorms/*.md 2>/dev/null | head -10)",
+      "WebSearch",
+      "mcp__plugin_compound-engineering_context7__query-docs",
+      "Bash(find /workspaces/hn-bot-farm/.venv/lib/python3.13/site-packages/crewai -path \"*/agents/agent.py\" -o -path \"*/task.py\" -o -path \"*/crew.py\" 2>/dev/null | head -10)",
+      "Bash(ls -la /workspaces/hn-bot-farm/.venv/lib/python3.13/site-packages/crewai/ | grep -E \"\\\\.py$|^d\")",
+      "Bash(ls -la /workspaces/hn-bot-farm/*.py /workspaces/hn-bot-farm/*.md 2>/dev/null)",
+      "Bash(source .venv/bin/activate && timeout 180 python hn_farm.py 2>&1)",
+      "Bash(ls -la /workspaces/hn-bot-farm/*.py)",
+      "Bash(source .venv/bin/activate && timeout 180 python hn_farm.py 2>&1 | tee /tmp/test_output.txt | tail -80)",
+      "Bash(gh pr view --json title,body,files,additions,deletions,baseRefName,headRefName 2>/dev/null || echo \"No PR found for this branch\")",
+      "Bash(find . -name \"*.md\" -exec grep -l -i \"crewai\\\\|api.*integration\\\\|sentiment\\\\|external.*api\" {} \\\\; | head -20)",
+      "Bash(python3 -c \"import os; print\\(os.path.exists\\('hn_farm.py'\\)\\)\")",
+      "Bash(python3 -m py_compile hn_farm.py && echo \"Syntax OK\")"
+    ],
+    "deny": [
+      "Read(.env*)",
+      "Edit(.env*)"
+    ],
+    "hooks": {
+      "PostToolUse": [
+        {
+          "matcher": "Edit",
+          "hooks": [
+            {
+              "type": "command",
+              "command": "python -m py_compile ${file} 2>/dev/null || true"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
