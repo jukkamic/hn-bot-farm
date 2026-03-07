@@ -9,6 +9,7 @@ import re
 import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime
 from typing import Any
 
 from dotenv import load_dotenv
@@ -336,8 +337,8 @@ edit_task = Task(
         "- vibe_reasoning (brief explanation)\n"
         "- comments_analyzed (number)\n\n"
         "You MUST extract these vibe_score and vibe_label values from the context JSON and include them in the output.\n\n"
-        "Create a file at 'output/hn_daily.md' with:\n"
-        "- A header with today's date\n"
+        f"Create a file at 'output/hn_daily.md' with:\n"
+        f"- A header with 'Hacker News Daily Digest - {datetime.now().strftime('%A %B %d, %Y')}'\n"
         "- A brief intro\n"
         "- Numbered list of stories with:\n"
         "  * Clickable title link\n"
