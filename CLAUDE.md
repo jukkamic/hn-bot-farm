@@ -1,8 +1,8 @@
 ## Python Environment
-Always activate the virtual environment before running Python scripts. Use `source .venv/bin/activate` or run scripts as `.venv/bin/python script.py`.
+Always use the virtual environment's Python when running Python scripts. Prefer running scripts as `.venv/bin/python script.py` over activating virtual environment and then running plain `python` command.
 
 ## Git Workflow 
-For git push operations, provide manual instructions rather than attempting to push directly, as GitHub authentication requires user credentials.
+Commit all changes with a good message. For git push operations, provide manual instructions rather than attempting to push directly, as GitHub authentication requires user credentials. You do not have access to git origin.
 
 ## CrewAI/Groq/Z.AI
-When working with CrewAI and Groq, validate tool schemas early and test with a simple agent before expanding to multi-agent workflows.
+When working with CrewAI and any LLM, validate tool schemas early and test with a simple agent before expanding to multi-agent workflows.
