@@ -16,7 +16,17 @@
       "Bash(gh pr view --json title,body,files,additions,deletions,baseRefName,headRefName 2>/dev/null || echo \"No PR found for this branch\")",
       "Bash(find . -name \"*.md\" -exec grep -l -i \"crewai\\\\|api.*integration\\\\|sentiment\\\\|external.*api\" {} \\\\; | head -20)",
       "Bash(python3 -c \"import os; print\\(os.path.exists\\('hn_farm.py'\\)\\)\")",
-      "Bash(python3 -m py_compile hn_farm.py && echo \"Syntax OK\")"
+      "Bash(python3 -m py_compile hn_farm.py && echo \"Syntax OK\")",
+      "Bash(git checkout -b feat/md-to-html-converter)",
+      "Bash(cd /workspaces/hn-bot-farm/utils && source ../.venv/bin/activate && python test_converter.py)",
+      "Bash(git checkout feat/md-to-html-converter)",
+      "Bash(source .venv/bin/activate && python -m utils.test_converter)",
+      "Bash(source .venv/bin/activate && python -c \"\nfrom pathlib import Path\nimport tempfile\n\nwith tempfile.TemporaryDirectory\\(\\) as tmpdir:\n    real_file = Path\\(tmpdir\\) / 'real.md'\n    real_file.write_text\\('# Real content'\\)\n    \n    symlink = Path\\(tmpdir\\) / 'link.md'\n    symlink.symlink_to\\(real_file\\)\n    \n    print\\('symlink path:', symlink\\)\n    print\\('is_symlink:', symlink.is_symlink\\(\\)\\)\n    print\\('after resolve:', symlink.resolve\\(\\)\\)\n    print\\('is_symlink after resolve:', symlink.resolve\\(\\).is_symlink\\(\\)\\)\n\")",
+      "Bash(source .venv/bin/activate && python utils/test_converter.py)",
+      "Bash(source /workspaces/hn-bot-farm/.venv/bin/activate && python -c \"from utils.md_converter import convert_markdown_to_html; print\\('Import works'\\)\")",
+      "Bash(source /workspaces/hn-bot-farm/.venv/bin/activate && python -m utils.test_converter)",
+      "Bash(source /workspaces/hn-bot-farm/.venv/bin/activate && python /workspaces/hn-bot-farm/utils/test_converter.py)",
+      "Bash(source .venv/bin/activate && python -c \"from utils.md_converter import convert_markdown_to_html; print\\(convert_markdown_to_html\\('# Test'\\)[:100]\\)\")"
     ],
     "deny": [
       "Read(.env*)",
