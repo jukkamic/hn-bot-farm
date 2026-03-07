@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """CrewAI application to fetch Hacker News stories and generate a newsletter."""
 
+import asyncio
 import html
 import json
 import os
 import re
 import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 from dotenv import load_dotenv
@@ -22,11 +24,13 @@ HTML_TAG_PATTERN = re.compile(r'<[^>]+>')
 WHITESPACE_PATTERN = re.compile(r'\s+')
 
 
-# --- Module-level Utility Functions ---
+# --- Module-level Configuration ---
 API_TIMEOUT_SECONDS = 10
 HN_API_BASE = "https://hacker-news.firebaseio.com/v0"
+MAX_WORKERS = 10  # Max concurrent connections
 
 
+# --- Module-level Utility Functions ---
 def fetch_hn_json(url: str, timeout: int = API_TIMEOUT_SECONDS) -> dict[str, Any]:
     """Fetch JSON from Hacker News API with proper timeout.
 
@@ -44,6 +48,52 @@ def fetch_hn_json(url: str, timeout: int = API_TIMEOUT_SECONDS) -> dict[str, Any
     """
     with urllib.request.urlopen(url, timeout=timeout) as response:
         return json.loads(response.read().decode('utf-8'))
+
+
+def fetch_hn_item(item_id: int) -> dict[str, Any] | None:
+    """Fetch a single HN item (story or comment) by ID.
+
+    Args:
+        item_id: The HN item ID
+
+    Returns:
+        Item data dict or None if fetch failed
+    """
+    try:
+        url = f"{HN_API_BASE}/item/{item_id}.json"
+        return fetch_hn_json(url)
+    except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, TimeoutError):
+        return None
+
+
+def fetch_items_parallel(item_ids: list[int], max_workers: int = MAX_WORKERS) -> list[dict[str, Any] | None]:
+    """Fetch multiple HN items in parallel using ThreadPoolExecutor.
+
+    P2-007: Parallel fetching reduces latency from O(n) to O(1) for API calls.
+
+    Args:
+        item_ids: List of HN item IDs to fetch
+        max_workers: Maximum concurrent threads
+
+    Returns:
+        List of item data dicts (same order as input IDs), None for failed fetches
+    """
+    results = {item_id: None for item_id in item_ids}
+
+    with ThreadPoolExecutor(max_workers=min(max_workers, len(item_ids))) as executor:
+        # Submit all fetch tasks
+        future_to_id = {executor.submit(fetch_hn_item, item_id): item_id for item_id in item_ids}
+
+        # Collect results as they complete
+        for future in as_completed(future_to_id):
+            item_id = future_to_id[future]
+            try:
+                results[item_id] = future.result()
+            except Exception:
+                results[item_id] = None
+
+    # Return in original order
+    return [results[item_id] for item_id in item_ids]
 
 
 def strip_html(text: str) -> str:
@@ -106,15 +156,19 @@ class FetchHNStoriesTool(BaseTool):
 
     def _run(self, query: str = "") -> str:
         """Fetch the top 5 current stories from Hacker News."""
-        # P1-002, P2-004: Use module-level function with timeout
+        # Get top story IDs (single call)
         top_stories_url = f"{HN_API_BASE}/topstories.json"
-        story_ids = fetch_hn_json(top_stories_url)
+        story_ids = fetch_hn_json(top_stories_url)[:5]
 
-        # Fetch details for top 5 stories
+        # P2-007: Fetch all 5 stories in parallel instead of sequentially
+        stories_data = fetch_items_parallel(story_ids)
+
+        # Build stories list
         stories = []
-        for story_id in story_ids[:5]:
-            story_url = f"{HN_API_BASE}/item/{story_id}.json"
-            story = fetch_hn_json(story_url)
+        for i, story in enumerate(stories_data):
+            if story is None:
+                continue
+            story_id = story_ids[i]
             stories.append({
                 'id': story_id,
                 'title': story.get('title', 'No title'),
@@ -156,37 +210,35 @@ class FetchHNCommentsTool(BaseTool):
         if comment_ids is None:
             comment_ids = []
 
+        max_comments = 5
+        ids_to_fetch = comment_ids[:max_comments]
+
+        # P2-007: Fetch all comments in parallel instead of sequentially
+        comments_data = fetch_items_parallel(ids_to_fetch)
+
         comments = []
         errors = []
-        max_comments = 5
 
-        for comment_id in comment_ids[:max_comments]:
-            try:
-                url = f"{HN_API_BASE}/item/{comment_id}.json"
-                # P2-004: Use module-level function with timeout
-                comment_data = fetch_hn_json(url)
+        for i, comment_data in enumerate(comments_data):
+            comment_id = ids_to_fetch[i]
 
-                if comment_data is None or comment_data.get('deleted') or comment_data.get('dead'):
-                    continue
+            if comment_data is None:
+                errors.append(f"Error fetching comment {comment_id}: Fetch failed")
+                continue
 
-                text = comment_data.get('text', '')
-                if not text:
-                    continue
+            if comment_data.get('deleted') or comment_data.get('dead'):
+                continue
 
-                comments.append({
-                    'id': comment_id,
-                    'text': strip_html(text),  # P3-010: Use module-level function
-                    'by': comment_data.get('by', 'unknown'),
-                    'time': comment_data.get('time', 0)
-                })
+            text = comment_data.get('text', '')
+            if not text:
+                continue
 
-            # P2-005: Narrowed exception handling to specific types
-            except (urllib.error.URLError, urllib.error.HTTPError) as e:
-                errors.append(f"Error fetching comment {comment_id}: Network error")
-            except json.JSONDecodeError:
-                errors.append(f"Error fetching comment {comment_id}: Invalid response")
-            except TimeoutError:
-                errors.append(f"Error fetching comment {comment_id}: Request timed out")
+            comments.append({
+                'id': comment_id,
+                'text': strip_html(text),
+                'by': comment_data.get('by', 'unknown'),
+                'time': comment_data.get('time', 0)
+            })
 
         result = {
             'story_id': story_id,
