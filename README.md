@@ -12,7 +12,7 @@ CrewAI application that fetches top Hacker News stories, analyzes comment sentim
 
 1. Open in VS Code → it should prompt to "Reopen in Container"
    - If not: `Ctrl+Shift+P` → "Dev Containers: Reopen in Container"
-2. Copy `.env example` to `.env` and add your API keys
+2. Copy `.env.example` to `.env` and add your API keys
 3. Run: `python hn_farm.py`
 
 ## Environment Variables
