@@ -15,33 +15,32 @@ load_dotenv()
 # --- LLM Provider Configuration ---
 providers = {
     "zai": {
-        "api_key": os.getenv("ZAI_API_KEY", ""),
-        "base_url": "https://api.z.ai/api/paas/v4/",
-        "model": "openai/glm-5"
+        "api_key": os.getenv("ZAI_API_KEY"),
+        # "base_url": "https://api.z.ai/api/paas/v4", # MUST be paas/v4 for Python/LiteLLM
+        "base_url": "https://api.z.ai/api/coding/paas/v4",
+        "model": "openai/glm-5" # Tell LiteLLM to treat Z.ai like OpenAI
     },
     "groq": {
-        "api_key": os.getenv("GROQ_API_KEY", ""),
-        "base_url": "https://api.groq.com/openai/v1/",
+        "api_key": os.getenv("GROQ_API_KEY"),
+        "base_url": "https://api.groq.com/openai/v1",
         "model": "groq/llama-3.3-70b-versatile"
     }
 }
 
-# --- THE ONE-LINER SWITCH ---
-# Change "zai" to "groq" here to instantly swap providers!
-active_provider = providers["groq"]
+active_provider = providers["zai"]
 
-# Set environment variables for LiteLLM (required by CrewAI for custom providers)
+# CrewAI/LiteLLM standard environment setup
 os.environ["OPENAI_API_KEY"] = active_provider["api_key"]
 os.environ["OPENAI_API_BASE"] = active_provider["base_url"]
 
-# Create LLM instance
+# Create the LLM instance that your Agents will use
 llm = LLM(model=active_provider["model"])
-
 
 # --- Custom Tool with explicit schema (fixes Groq compatibility) ---
 class FetchHNStoriesInput(BaseModel):
     """Input schema for fetch_hn_stories."""
-    query: str = Field(default="", description="No parameters needed - leave empty")
+    query: str = Field(
+        default="", description="No parameters needed - leave empty")
 
 
 class FetchHNStoriesTool(BaseTool):
