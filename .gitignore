@@ -55,3 +55,9 @@ htmlcov/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Generated output
+output/
+
+# Generated output
+output/

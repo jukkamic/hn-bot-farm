@@ -45,7 +45,7 @@ class FetchHNStoriesInput(BaseModel):
 
 class FetchHNStoriesTool(BaseTool):
     name: str = "fetch_hn_stories"
-    description: str = "Fetch the top 5 current stories from Hacker News. Returns a JSON string with id, title, and url for each story."
+    description: str = "Fetch the top 5 current stories from Hacker News. Returns a JSON string with id, title, url, kids, score, and by for each story."
     args_schema: type[BaseModel] = FetchHNStoriesInput
 
     def _run(self, query: str = "") -> str:
@@ -66,13 +66,96 @@ class FetchHNStoriesTool(BaseTool):
             stories.append({
                 'id': story_id,
                 'title': story.get('title', 'No title'),
-                'url': story.get('url', 'No URL')
+                'url': story.get('url', f"https://news.ycombinator.com/item?id={story_id}"),
+                'kids': story.get('kids', []),
+                'score': story.get('score', 0),
+                'by': story.get('by', 'unknown')
             })
 
         return json.dumps(stories, indent=2)
 
 
 fetch_hn_stories = FetchHNStoriesTool()
+
+
+# --- Custom Tool for fetching HN comments ---
+class FetchHNCommentsInput(BaseModel):
+    """Input schema for fetch_hn_comments."""
+    story_id: int = Field(description="The HN story ID")
+    comment_ids: list[int] = Field(
+        default=[],
+        description="List of comment IDs to fetch (will fetch up to 5)"
+    )
+
+
+class FetchHNCommentsTool(BaseTool):
+    name: str = "fetch_hn_comments"
+    description: str = (
+        "Fetch the top comments for a Hacker News story. "
+        "Returns comment text (HTML-stripped), author, and metadata. "
+        "Use this to analyze community sentiment."
+    )
+    args_schema: type[BaseModel] = FetchHNCommentsInput
+
+    def _run(self, story_id: int, comment_ids: list[int] = []) -> str:
+        """Fetch up to 5 comments from HN API."""
+        import html
+        import re
+
+        def fetch_json(url):
+            with urllib.request.urlopen(url, timeout=10) as response:
+                return json.loads(response.read().decode('utf-8'))
+
+        def strip_html(text: str) -> str:
+            """Remove HTML tags and decode entities."""
+            if not text:
+                return ""
+            # Remove HTML tags
+            text = re.sub(r'<[^>]+>', ' ', text)
+            # Decode HTML entities
+            text = html.unescape(text)
+            # Clean up whitespace
+            text = re.sub(r'\s+', ' ', text).strip()
+            return text
+
+        comments = []
+        errors = []
+        max_comments = 5
+
+        for comment_id in comment_ids[:max_comments]:
+            try:
+                url = f"https://hacker-news.firebaseio.com/v0/item/{comment_id}.json"
+                comment_data = fetch_json(url)
+
+                if comment_data is None or comment_data.get('deleted') or comment_data.get('dead'):
+                    continue
+
+                text = comment_data.get('text', '')
+                if not text:
+                    continue
+
+                comments.append({
+                    'id': comment_id,
+                    'text': strip_html(text),
+                    'by': comment_data.get('by', 'unknown'),
+                    'time': comment_data.get('time', 0)
+                })
+
+            except Exception as e:
+                errors.append(f"Error fetching comment {comment_id}: {str(e)}")
+                continue
+
+        result = {
+            'story_id': story_id,
+            'comments': comments,
+            'comments_found': len(comments),
+            'errors': errors
+        }
+
+        return json.dumps(result, indent=2)
+
+
+fetch_hn_comments = FetchHNCommentsTool()
 
 
 # Initialize tools
@@ -91,6 +174,19 @@ tech_researcher = Agent(
     verbose=True
 )
 
+sentiment_analyst = Agent(
+    role="Sentiment Analyst",
+    goal="Analyze HN comments and assign Vibe Scores to stories",
+    backstory=(
+        "You are an expert at reading the room. You analyze online discussions "
+        "to understand community sentiment. You assign scores on a 1-5 scale "
+        "where 1=Very Negative, 2=Negative, 3=Neutral, 4=Positive, 5=Very Positive."
+    ),
+    tools=[fetch_hn_comments],
+    llm=llm,
+    verbose=True
+)
+
 newsletter_editor = Agent(
     role="Newsletter Editor",
     goal="Format raw story data into a clean, professional Markdown newsletter",
@@ -105,29 +201,69 @@ newsletter_editor = Agent(
 
 # Define Tasks
 research_task = Task(
-    description="Fetch the top 5 current stories from Hacker News using the fetch_hn_stories tool.",
-    expected_output="A JSON list of 5 stories with their titles and URLs.",
+    description=(
+        "Fetch the top 5 current stories from Hacker News using the fetch_hn_stories tool. "
+        "Return the EXACT JSON output from the tool without modification. "
+        "Do NOT summarize or reformat - pass through the raw JSON which includes id, title, url, kids, score, and by fields."
+    ),
+    expected_output="The exact JSON list returned by the tool, containing 5 stories with id, title, url, kids (comment IDs), score, and by fields. Do not summarize.",
     agent=tech_researcher
+)
+
+sentiment_task = Task(
+    description=(
+        "Analyze the sentiment of comments for each story. "
+        "For each story, use the fetch_hn_comments tool with the story's ID "
+        "and the first 5 comment IDs from its 'kids' field. "
+        "Assign a Vibe Score (1-5) based on the overall sentiment of the comments. "
+        "If a story has no comments, assign 'N/A' with reason 'No comments available'.\n\n"
+        "Vibe Score Scale:\n"
+        "- 1: Very Negative (hostile, dismissive, critical)\n"
+        "- 2: Negative (skeptical, concerned, critical)\n"
+        "- 3: Neutral (mixed, factual, indifferent)\n"
+        "- 4: Positive (interested, approving, supportive)\n"
+        "- 5: Very Positive (enthusiastic, praiseworthy, excited)\n\n"
+        "Return a JSON list with each story including: id, title, url, vibe_score, vibe_label, vibe_reasoning, comments_analyzed."
+    ),
+    expected_output="A JSON list of stories with vibe scores and reasoning.",
+    agent=sentiment_analyst,
+    context=[research_task]
 )
 
 edit_task = Task(
     description=(
-        "Take the raw Hacker News story data and format it into a professional "
-        "Markdown newsletter. Create a file called 'hn_daily.md' with:\n"
+        "Take the story data with vibe scores from the context and format it into a professional "
+        "Markdown newsletter.\n\n"
+        "IMPORTANT: The context contains a JSON list from the sentiment analyst. Each story in that JSON has:\n"
+        "- id, title, url\n"
+        "- vibe_score (a number 1-5, or 'N/A')\n"
+        "- vibe_label (e.g., 'Very Positive', 'Positive', 'Neutral', etc.)\n"
+        "- vibe_reasoning (brief explanation)\n"
+        "- comments_analyzed (number)\n\n"
+        "You MUST extract these vibe_score and vibe_label values from the context JSON and include them in the output.\n\n"
+        "Create a file at 'output/hn_daily.md' with:\n"
         "- A header with today's date\n"
         "- A brief intro\n"
-        "- Numbered list of stories with clickable links\n"
+        "- Numbered list of stories with:\n"
+        "  * Clickable title link\n"
+        "  * Vibe score in format '*Vibe: X/5 Label*' (use the actual vibe_score and vibe_label from context)\n"
+        "  * Brief reasoning (use vibe_reasoning from context)\n"
+        "  * One-line description\n"
         "- A closing section\n\n"
-        "Use the FileWriterTool to save the file."
+        "Example format for each story:\n"
+        "1. **[Title](URL)** *Vibe: 5/5 Very Positive*\n"
+        "   Comments show excitement about this discovery.\n\n"
+        "Use the FileWriterTool with directory='output' and filename='hn_daily.md'."
     ),
-    expected_output="A confirmation that hn_daily.md has been created with formatted content.",
-    agent=newsletter_editor
+    expected_output="A confirmation that output/hn_daily.md has been created with formatted content including the actual vibe scores from the context.",
+    agent=newsletter_editor,
+    context=[sentiment_task]
 )
 
 # Assemble Crew
 crew = Crew(
-    agents=[tech_researcher, newsletter_editor],
-    tasks=[research_task, edit_task],
+    agents=[tech_researcher, sentiment_analyst, newsletter_editor],
+    tasks=[research_task, sentiment_task, edit_task],
     memory=False,
     verbose=True
 )
