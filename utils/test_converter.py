@@ -76,6 +76,31 @@ def test_xss_prevention() -> None:
     print("[PASS] XSS prevention test")
 
 
+def test_xss_edge_cases() -> None:
+    """Test XSS edge cases found in security review."""
+    # Test 1: Unquoted event handlers
+    html = convert_markdown_to_html('<img src=x onerror=alert(1)>')
+    assert "onerror=" not in html or "alert" not in html, \
+        "Unquoted event handlers should be removed"
+
+    # Test 2: SVG animate XSS
+    html = convert_markdown_to_html('<svg><animate onbegin=alert(1)>')
+    assert "<svg>" not in html, "SVG tags should be removed"
+    assert "<animate" not in html, "Animate tags should be removed"
+
+    # Test 3: Protocol-relative URL for CSS (should use default)
+    html = convert_markdown_to_html('# Test', css_cdn='//evil.com/style.css')
+    assert "//evil.com" not in html, "Protocol-relative URLs should use default"
+    assert "sakura.css" in html, "Should use default Sakura CSS"
+
+    # Test 4: data: URI in CSS (should use default)
+    html = convert_markdown_to_html('# Test', css_cdn='data:text/css,body{background:red}')
+    assert "data:" not in html, "data: URIs should use default"
+    assert "sakura.css" in html, "Should use default Sakura CSS"
+
+    print("[PASS] XSS edge cases test")
+
+
 def test_empty_input() -> None:
     """Test that empty input raises ValueError."""
     try:
@@ -159,18 +184,19 @@ def test_file_not_found() -> None:
 
 def main() -> None:
     """Run all tests."""
-    print("Running md_converter tests...\\n")
+    print("Running md_converter tests...\n")
 
     test_conversion()
     test_fenced_code_blocks()
     test_xss_prevention()
+    test_xss_edge_cases()
     test_empty_input()
     test_size_limit()
     test_convert_file()
     test_symlink_rejection()
     test_file_not_found()
 
-    print("\\n✅ All tests passed!")
+    print("\n✅ All tests passed!")
 
 
 if __name__ == "__main__":

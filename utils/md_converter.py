@@ -21,19 +21,20 @@ MARKDOWN_EXTRAS = [
 
 # Patterns for XSS sanitization
 _DANGEROUS_TAG_PATTERN = re.compile(
-    r'<(script|style|iframe|object|embed|form|input|button|textarea|select|meta|link|base)[^>]*>.*?</\1>',
+    r'<(script|style|iframe|object|embed|form|input|button|textarea|select|meta|link|base|svg|animate)[^>]*>.*?</\1>',
     re.IGNORECASE | re.DOTALL
 )
 _DANGEROUS_TAG_OPEN_PATTERN = re.compile(
-    r'<(script|style|iframe|object|embed|form|input|button|textarea|select|meta|link|base)[^>]*>',
+    r'<(script|style|iframe|object|embed|form|input|button|textarea|select|meta|link|base|svg|animate)[^>]*>',
     re.IGNORECASE
 )
 _JS_URL_PATTERN = re.compile(
     r'(href|src|action)\s*=\s*["\']?\s*javascript:',
     re.IGNORECASE
 )
+# Match event handlers with or without quotes: onclick="x" or onclick=x
 _EVENT_HANDLER_PATTERN = re.compile(
-    r'\s+on\w+\s*=\s*["\'][^"\']*["\']',
+    r'\s+on\w+\s*=\s*(["\'][^"\']*["\']|[^\s>]+)',
     re.IGNORECASE
 )
 
@@ -60,7 +61,10 @@ def _validate_css_url(css_cdn: str) -> str:
     Returns:
         Validated URL or default SAKURA_CDN if invalid
     """
-    if css_cdn.startswith("https://") or css_cdn.startswith("/"):
+    # Only allow https:// or absolute paths (not protocol-relative //)
+    if css_cdn.startswith("https://"):
+        return css_cdn
+    if css_cdn.startswith("/") and not css_cdn.startswith("//"):
         return css_cdn
     return SAKURA_CDN
 
