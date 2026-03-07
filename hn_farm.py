@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
 """CrewAI application to fetch Hacker News stories and generate a newsletter."""
 
-import os
+import html
 import json
+import os
+import re
+import urllib.error
 import urllib.request
+from typing import Any
+
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from crewai import Agent, Task, Crew, LLM
@@ -12,13 +17,62 @@ from crewai_tools import FileWriterTool
 
 load_dotenv()
 
+# --- Pre-compiled Regex Patterns (P3-010) ---
+HTML_TAG_PATTERN = re.compile(r'<[^>]+>')
+WHITESPACE_PATTERN = re.compile(r'\s+')
+
+
+# --- Module-level Utility Functions ---
+API_TIMEOUT_SECONDS = 10
+HN_API_BASE = "https://hacker-news.firebaseio.com/v0"
+
+
+def fetch_hn_json(url: str, timeout: int = API_TIMEOUT_SECONDS) -> dict[str, Any]:
+    """Fetch JSON from Hacker News API with proper timeout.
+
+    Args:
+        url: The full URL to fetch from
+        timeout: Request timeout in seconds (default: 10)
+
+    Returns:
+        Parsed JSON response as dictionary
+
+    Raises:
+        urllib.error.URLError: Network connectivity issues
+        urllib.error.HTTPError: HTTP error responses
+        json.JSONDecodeError: Invalid JSON response
+    """
+    with urllib.request.urlopen(url, timeout=timeout) as response:
+        return json.loads(response.read().decode('utf-8'))
+
+
+def strip_html(text: str) -> str:
+    """Remove HTML tags and decode entities from text.
+
+    Args:
+        text: Input text potentially containing HTML
+
+    Returns:
+        Clean text with HTML removed and entities decoded
+    """
+    if not text:
+        return ""
+    # Remove HTML tags using pre-compiled pattern
+    text = HTML_TAG_PATTERN.sub(' ', text)
+    # Decode HTML entities
+    text = html.unescape(text)
+    # Clean up whitespace using pre-compiled pattern
+    text = WHITESPACE_PATTERN.sub(' ', text).strip()
+    return text
+
+
 # --- LLM Provider Configuration ---
 providers = {
     "zai": {
         "api_key": os.getenv("ZAI_API_KEY"),
         # "base_url": "https://api.z.ai/api/paas/v4", # MUST be paas/v4 for Python/LiteLLM
         "base_url": "https://api.z.ai/api/coding/paas/v4",
-        "model": "openai/glm-5" # Tell LiteLLM to treat Z.ai like OpenAI
+        "model": "openai/glm-5"  # Tell LiteLLM to treat Z.ai like OpenAI
     },
     "groq": {
         "api_key": os.getenv("GROQ_API_KEY"),
@@ -30,11 +84,13 @@ providers = {
 active_provider = providers["zai"]
 
 # CrewAI/LiteLLM standard environment setup
+# Note: CrewAI's LLM class requires these env vars for OpenAI-compatible APIs
 os.environ["OPENAI_API_KEY"] = active_provider["api_key"]
 os.environ["OPENAI_API_BASE"] = active_provider["base_url"]
 
 # Create the LLM instance that your Agents will use
 llm = LLM(model=active_provider["model"])
+
 
 # --- Custom Tool with explicit schema (fixes Groq compatibility) ---
 class FetchHNStoriesInput(BaseModel):
@@ -50,19 +106,15 @@ class FetchHNStoriesTool(BaseTool):
 
     def _run(self, query: str = "") -> str:
         """Fetch the top 5 current stories from Hacker News."""
-        def fetch_json(url):
-            with urllib.request.urlopen(url) as response:
-                return json.loads(response.read().decode('utf-8'))
-
-        # Get top story IDs
-        top_stories_url = "https://hacker-news.firebaseio.com/v0/topstories.json"
-        story_ids = fetch_json(top_stories_url)
+        # P1-002, P2-004: Use module-level function with timeout
+        top_stories_url = f"{HN_API_BASE}/topstories.json"
+        story_ids = fetch_hn_json(top_stories_url)
 
         # Fetch details for top 5 stories
         stories = []
         for story_id in story_ids[:5]:
-            story_url = f"https://hacker-news.firebaseio.com/v0/item/{story_id}.json"
-            story = fetch_json(story_url)
+            story_url = f"{HN_API_BASE}/item/{story_id}.json"
+            story = fetch_hn_json(story_url)
             stories.append({
                 'id': story_id,
                 'title': story.get('title', 'No title'),
@@ -97,26 +149,12 @@ class FetchHNCommentsTool(BaseTool):
     )
     args_schema: type[BaseModel] = FetchHNCommentsInput
 
-    def _run(self, story_id: int, comment_ids: list[int] = []) -> str:
+    # P1-001: Fixed mutable default argument bug
+    def _run(self, story_id: int, comment_ids: list[int] | None = None) -> str:
         """Fetch up to 5 comments from HN API."""
-        import html
-        import re
-
-        def fetch_json(url):
-            with urllib.request.urlopen(url, timeout=10) as response:
-                return json.loads(response.read().decode('utf-8'))
-
-        def strip_html(text: str) -> str:
-            """Remove HTML tags and decode entities."""
-            if not text:
-                return ""
-            # Remove HTML tags
-            text = re.sub(r'<[^>]+>', ' ', text)
-            # Decode HTML entities
-            text = html.unescape(text)
-            # Clean up whitespace
-            text = re.sub(r'\s+', ' ', text).strip()
-            return text
+        # P1-001: Handle None for mutable default
+        if comment_ids is None:
+            comment_ids = []
 
         comments = []
         errors = []
@@ -124,8 +162,9 @@ class FetchHNCommentsTool(BaseTool):
 
         for comment_id in comment_ids[:max_comments]:
             try:
-                url = f"https://hacker-news.firebaseio.com/v0/item/{comment_id}.json"
-                comment_data = fetch_json(url)
+                url = f"{HN_API_BASE}/item/{comment_id}.json"
+                # P2-004: Use module-level function with timeout
+                comment_data = fetch_hn_json(url)
 
                 if comment_data is None or comment_data.get('deleted') or comment_data.get('dead'):
                     continue
@@ -136,14 +175,18 @@ class FetchHNCommentsTool(BaseTool):
 
                 comments.append({
                     'id': comment_id,
-                    'text': strip_html(text),
+                    'text': strip_html(text),  # P3-010: Use module-level function
                     'by': comment_data.get('by', 'unknown'),
                     'time': comment_data.get('time', 0)
                 })
 
-            except Exception as e:
-                errors.append(f"Error fetching comment {comment_id}: {str(e)}")
-                continue
+            # P2-005: Narrowed exception handling to specific types
+            except (urllib.error.URLError, urllib.error.HTTPError) as e:
+                errors.append(f"Error fetching comment {comment_id}: Network error")
+            except json.JSONDecodeError:
+                errors.append(f"Error fetching comment {comment_id}: Invalid response")
+            except TimeoutError:
+                errors.append(f"Error fetching comment {comment_id}: Request timed out")
 
         result = {
             'story_id': story_id,
