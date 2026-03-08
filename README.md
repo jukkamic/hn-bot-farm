@@ -19,16 +19,19 @@ CrewAI application that fetches top Hacker News stories, analyzes comment sentim
 
 | Variable | Purpose |
 |----------|---------|
-| `ZAI_API_KEY` | Z.ai GLM-5 model (default provider) |
-| `GROQ_API_KEY` | Groq Llama model (alternative) |
+| `LLM_PROVIDER` | LLM provider to use: `zai` (default) or `groq` |
+| `ZAI_API_KEY` | Z.ai API key (required if `LLM_PROVIDER=zai`) |
+| `GROQ_API_KEY` | Groq API key (required if `LLM_PROVIDER=groq`) |
 
 ## Switch LLM Provider
 
-Edit `hn_farm.py` line ~84:
+Set the `LLM_PROVIDER` environment variable in your `.env` file:
 
-```python
-active_provider = providers["zai"]  # Change to "groq" to use Groq
+```bash
+LLM_PROVIDER=groq  # Options: zai (default), groq
 ```
+
+The application validates API keys on startup and will error if the required key is missing.
 
 ## Output
 
@@ -41,10 +44,39 @@ Generated at `output/hn_daily.md` with:
 
 3-agent pipeline: **Researcher** (fetches stories) → **Sentiment Analyst** (analyzes comments) → **Editor** (formats output)
 
+## Utilities
+
+### Markdown to HTML Converter
+
+Convert the generated newsletter to styled HTML:
+
+```bash
+.venv/bin/python utils/md_converter.py output/hn_daily.md
+```
+
+Generates `output/hn_daily.html` with Sakura CSS styling.
+
+**Options:**
+- Custom output path: `.venv/bin/python utils/md_converter.py input.md output.html`
+- XSS-sanitized output (built-in)
+
+### Citation Validator
+
+Validate HN item IDs for citations (development/debug tool):
+
+```bash
+.venv/bin/python utils/citation_validator.py <item_id>
+```
+
+Returns `VALID` or `INVALID` based on Hacker News API response.
+
 ## Files
 
 | File | Purpose |
 |------|---------|
 | `hn_farm.py` | Main application |
+| `utils/md_converter.py` | Markdown to HTML converter |
+| `utils/citation_validator.py` | HN item ID validator |
 | `requirements.txt` | Dependencies |
 | `output/hn_daily.md` | Generated newsletter |
+| `output/hn_daily.html` | HTML version (optional) |
