@@ -44,7 +44,7 @@
           },
           {
             "type": "command",
-            "command": "python -m py_compile ${file} 2>/dev/null || true"
+            "command": "./.venv/bin/python -m py_compile ${file} 2>/dev/null || true"
           }
         ]
       }
