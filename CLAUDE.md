@@ -12,3 +12,7 @@ No Remote Pushes: You do not have write access to the git remote. Do not attempt
 Validate tool schemas early.
 
 Always test with a simple, single agent before expanding to multi-agent workflows.
+
+## Global Triggers
+
+Analysis Trigger: Whenever the user asks for "Vibes" or "Sentiment Analysis," automatically invoke the evidence-based-analysis skill to ensure citations are single-pass and validated.
