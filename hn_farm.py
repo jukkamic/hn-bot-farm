@@ -151,13 +151,13 @@ providers = {
 
 active_provider = providers["zai"]
 
-# CrewAI/LiteLLM standard environment setup
-# Note: CrewAI's LLM class requires these env vars for OpenAI-compatible APIs
-os.environ["OPENAI_API_KEY"] = active_provider["api_key"]
-os.environ["OPENAI_API_BASE"] = active_provider["base_url"]
-
 # Create the LLM instance that your Agents will use
-llm = LLM(model=active_provider["model"])
+# Pass credentials directly to avoid exposing them as environment variables
+llm = LLM(
+    model=active_provider["model"],
+    api_key=active_provider["api_key"],
+    base_url=active_provider["base_url"]
+)
 
 
 # --- Custom Tool with explicit schema (fixes Groq compatibility) ---
