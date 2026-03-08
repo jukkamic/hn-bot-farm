@@ -208,7 +208,13 @@ class FetchHNCommentsInput(BaseModel):
     story_id: int = Field(description="The HN story ID")
     comment_ids: list[int] = Field(
         default=[],
-        description="List of comment IDs to fetch (will fetch up to 5)"
+        description="List of comment IDs to fetch (will fetch up to max_comments)"
+    )
+    max_comments: int = Field(
+        default=5,
+        ge=1,
+        le=20,
+        description="Maximum comments to return (1-20)"
     )
 
 
@@ -222,13 +228,12 @@ class FetchHNCommentsTool(BaseTool):
     args_schema: type[BaseModel] = FetchHNCommentsInput
 
     # P1-001: Fixed mutable default argument bug
-    def _run(self, story_id: int, comment_ids: list[int] | None = None) -> str:
-        """Fetch up to 5 comments from HN API."""
+    def _run(self, story_id: int, comment_ids: list[int] | None = None, max_comments: int = 5) -> str:
+        """Fetch up to max_comments comments from HN API."""
         # P1-001: Handle None for mutable default
         if comment_ids is None:
             comment_ids = []
 
-        max_comments = 5
         ids_to_fetch = comment_ids[:max_comments]
 
         # P2-007: Fetch all comments in parallel instead of sequentially
@@ -389,6 +394,19 @@ edit_task = Task(
         "- Replace '[' with '\\\\[' and ']' with '\\\\]'\n"
         "- Replace '(' with '\\\\(' and ')' with '\\\\)'\n"
         "This prevents Markdown injection from comment text.\n\n"
+
+        "VALIDATION - Comment IDs:\n"
+        "Before creating any HN link, verify the comment_id is a valid integer:\n"
+        "- If comment_id is None, empty, or contains non-numeric characters, SKIP that link\n"
+        "- Valid examples: 12345, 98765432\n"
+        "- Invalid examples: null, '', 'abc', '12abc'\n\n"
+
+        "ERROR HANDLING:\n"
+        "Handle missing or malformed data gracefully:\n"
+        "- If lead_quote is missing, null, or empty {}, skip the blockquote section entirely\n"
+        "- If notable_comments is missing or empty [], use vibe_reasoning as-is without link replacements\n"
+        "- If quote_snippet is not found in vibe_reasoning after 2 attempts, skip that link\n"
+        "- Never create broken or malformed URLs in the output\n\n"
 
         "LINK FORMATTING:\n"
         "1. Lead Quote (always first, as blockquote):\n"

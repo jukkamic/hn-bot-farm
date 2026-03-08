@@ -1,5 +1,5 @@
 ---
-status: pending
+status: complete
 priority: p2
 issue_id: 008
 tags: [code-review, agent-native, flexibility]
@@ -73,10 +73,10 @@ class FetchHNCommentsTool(BaseTool):
 
 ## Acceptance Criteria
 
-- [ ] max_comments added to input schema
-- [ ] Default of 5 maintained
-- [ ] Reasonable upper limit enforced (e.g., 20)
-- [ ] Agent can override via tool input
+- [x] max_comments added to input schema
+- [x] Default of 5 maintained
+- [x] Reasonable upper limit enforced (e.g., 20)
+- [x] Agent can override via tool input
 
 ## Work Log
 

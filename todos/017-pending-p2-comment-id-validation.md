@@ -1,5 +1,5 @@
 ---
-status: pending
+status: complete
 priority: p2
 issue_id: "017"
 tags: [code-review, security, validation]
@@ -77,8 +77,8 @@ Use Solution 1 for immediate fix. Consider Solution 3 for comprehensive validati
 
 ## Acceptance Criteria
 
-- [ ] Non-numeric comment_ids are caught and handled
-- [ ] No broken URLs in newsletter output
+- [x] Non-numeric comment_ids are caught and handled
+- [x] No broken URLs in newsletter output
 - [ ] Test with malformed IDs
 
 ## Work Log
