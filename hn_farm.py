@@ -310,48 +310,86 @@ sentiment_task = Task(
     description=(
         "Analyze the sentiment of comments for each story. "
         "For each story, use the fetch_hn_comments tool with the story's ID "
-        "and the first 5 comment IDs from its 'kids' field. "
-        "Assign a Vibe Score (1-5) based on the overall sentiment of the comments. "
-        "If a story has no comments, assign 'N/A' with reason 'No comments available'.\n\n"
+        "and the first 5 comment IDs from its 'kids' field.\n\n"
+
         "Vibe Score Scale:\n"
         "- 1: Very Negative (hostile, dismissive, critical)\n"
         "- 2: Negative (skeptical, concerned, critical)\n"
         "- 3: Neutral (mixed, factual, indifferent)\n"
         "- 4: Positive (interested, approving, supportive)\n"
         "- 5: Very Positive (enthusiastic, praiseworthy, excited)\n\n"
-        "Return a JSON list with each story including: id, title, url, vibe_score, vibe_label, vibe_reasoning, comments_analyzed."
+
+        "SINGLE-PASS ANALYSIS:\n"
+        "As you read each comment, decide if it's NOTABLE. A notable comment:\n"
+        "- Perfectly represents the overall mood, OR\n"
+        "- Expresses a specific viewpoint worth highlighting, OR\n"
+        "- Is particularly well-phrased or memorable\n\n"
+
+        "OUTPUT STRUCTURE:\n"
+        "1. lead_quote: The SINGLE MOST representative comment\n"
+        "   - comment_id: the HN comment ID\n"
+        "   - text: a 1-2 sentence excerpt (this will be the blockquote)\n\n"
+
+        "2. notable_comments: 1-2 ADDITIONAL comments worth linking\n"
+        "   - comment_id: the HN comment ID\n"
+        "   - quote_snippet: a 2-4 word phrase YOU WILL USE in your reasoning\n"
+        "   - context: brief note why this comment is notable\n\n"
+
+        "3. vibe_reasoning: Your analysis text that MUST INCLUDE the quote_snippets\n"
+        "   - When you mention a notable comment, use its exact quote_snippet\n"
+        "   - Example: If quote_snippet is 'nostalgic memories', write 'shared nostalgic memories'\n\n"
+
+        "CRITICAL: Your vibe_reasoning must contain the exact quote_snippet phrases.\n"
+        "The editor will search for these phrases and convert them to links.\n\n"
+
+        "Return a JSON list with each story including:\n"
+        "- id, title, url\n"
+        "- vibe_score, vibe_label, vibe_reasoning\n"
+        "- lead_quote: {comment_id, text}\n"
+        "- notable_comments: [{comment_id, quote_snippet, context}]\n"
+        "- comments_analyzed\n\n"
+
+        "If a story has no comments, assign vibe_score='N/A' with empty lead_quote and notable_comments."
     ),
-    expected_output="A JSON list of stories with vibe scores and reasoning.",
+    expected_output="A JSON list of stories with vibe scores, lead quotes, and notable comments.",
     agent=sentiment_analyst,
     context=[research_task]
 )
 
 edit_task = Task(
     description=(
-        "Take the story data with vibe scores from the context and format it into a professional "
-        "Markdown newsletter.\n\n"
-        "IMPORTANT: The context contains a JSON list from the sentiment analyst. Each story in that JSON has:\n"
+        "Take the story data from the context and format it into a professional "
+        "Markdown newsletter with comment links.\n\n"
+
+        "INPUT STRUCTURE (from sentiment analyst):\n"
         "- id, title, url\n"
-        "- vibe_score (a number 1-5, or 'N/A')\n"
-        "- vibe_label (e.g., 'Very Positive', 'Positive', 'Neutral', etc.)\n"
-        "- vibe_reasoning (brief explanation)\n"
-        "- comments_analyzed (number)\n\n"
-        "You MUST extract these vibe_score and vibe_label values from the context JSON and include them in the output.\n\n"
+        "- vibe_score, vibe_label, vibe_reasoning\n"
+        "- lead_quote: {comment_id, text}\n"
+        "- notable_comments: [{comment_id, quote_snippet, context}]\n\n"
+
+        "LINK FORMATTING:\n"
+        "1. Lead Quote (always first, as blockquote):\n"
+        "   > \"[lead_quote.text](https://news.ycombinator.com/item?id=lead_quote.comment_id)\"\n\n"
+
+        "2. Notable Comments (string replacement in reasoning):\n"
+        "   - Find each quote_snippet in vibe_reasoning\n"
+        "   - Replace with: [quote_snippet](https://news.ycombinator.com/item?id=comment_id)\n"
+        "   - SKIP if comment_id matches lead_quote.comment_id (no duplicates)\n\n"
+
+        "FORMAT FOR EACH STORY:\n"
+        "1. **[Title](URL)** *Vibe: X/5 Label*\n\n"
+        "   > \"[lead_quote with link]\"\n\n"
+        "   [vibe_reasoning with notable comment links embedded]\n\n"
+
         f"Create a file at 'output/hn_daily.md' with:\n"
-        f"- A header with 'Hacker News Daily Digest - {datetime.now().strftime('%A %B %d, %Y')}'\n"
-        "- A brief intro\n"
-        "- Numbered list of stories with:\n"
-        "  * Clickable title link\n"
-        "  * Vibe score in format '*Vibe: X/5 Label*' (use the actual vibe_score and vibe_label from context)\n"
-        "  * Brief reasoning (use vibe_reasoning from context)\n"
-        "  * One-line description\n"
-        "- A closing section\n\n"
-        "Example format for each story:\n"
-        "1. **[Title](URL)** *Vibe: 5/5 Very Positive*\n"
-        "   Comments show excitement about this discovery.\n\n"
+        f"- Header: 'Hacker News Daily Digest - {datetime.now().strftime('%A %B %d, %Y')}'\n"
+        "- Brief intro\n"
+        "- Numbered list of stories\n"
+        "- Closing section\n\n"
+
         "Use the FileWriterTool with directory='output' and filename='hn_daily.md'."
     ),
-    expected_output="A confirmation that output/hn_daily.md has been created with formatted content including the actual vibe scores from the context.",
+    expected_output="Confirmation that output/hn_daily.md has been created with lead quotes and comment links.",
     agent=newsletter_editor,
     context=[sentiment_task]
 )
