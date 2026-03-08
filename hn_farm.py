@@ -149,7 +149,21 @@ providers = {
     }
 }
 
-active_provider = providers["zai"]
+# Select provider from environment variable (023)
+provider_name = os.getenv("LLM_PROVIDER", "zai")
+if provider_name not in providers:
+    raise ValueError(
+        f"Unknown LLM provider: '{provider_name}'. "
+        f"Available providers: {list(providers.keys())}"
+    )
+active_provider = providers[provider_name]
+
+# Validate API key for active provider (024)
+if not active_provider.get("api_key"):
+    raise ValueError(
+        f"Missing API key for provider '{provider_name}'. "
+        f"Set the {provider_name.upper()}_API_KEY environment variable."
+    )
 
 # Create the LLM instance that your Agents will use
 # Pass credentials directly to avoid exposing them as environment variables
