@@ -26,7 +26,8 @@
       "Bash(source /workspaces/hn-bot-farm/.venv/bin/activate && python -c \"from utils.md_converter import convert_markdown_to_html; print\\('Import works'\\)\")",
       "Bash(source /workspaces/hn-bot-farm/.venv/bin/activate && python -m utils.test_converter)",
       "Bash(source /workspaces/hn-bot-farm/.venv/bin/activate && python /workspaces/hn-bot-farm/utils/test_converter.py)",
-      "Bash(source .venv/bin/activate && python -c \"from utils.md_converter import convert_markdown_to_html; print\\(convert_markdown_to_html\\('# Test'\\)[:100]\\)\")"
+      "Bash(source .venv/bin/activate && python -c \"from utils.md_converter import convert_markdown_to_html; print\\(convert_markdown_to_html\\('# Test'\\)[:100]\\)\")",
+      "Bash(ls -la docs/plans/*analysis*lead*quote*.md 2>/dev/null)"
     ],
     "deny": [
       "Read(.env*)",
@@ -34,6 +35,17 @@
     ]
   },
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Write|Edit|Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/guardrail.sh"
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Edit",
