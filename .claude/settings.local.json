@@ -32,18 +32,22 @@
       "Read(.env*)",
       "Edit(.env*)"
     ],
-    "hooks": {
-      "PostToolUse": [
-        {
-          "matcher": "Edit",
-          "hooks": [
-            {
-              "type": "command",
-              "command": "python -m py_compile ${file} 2>/dev/null || true"
-            }
-          ]
-        }
-      ]
-    }
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "Always run md-converter skill after a task edits or creates hn_daily.md"
+          },
+          {
+            "type": "command",
+            "command": "python -m py_compile ${file} 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
   }
 }

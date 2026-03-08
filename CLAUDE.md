@@ -1,14 +1,14 @@
-## Python Environment
-Always use the virtual environment's Python when running Python scripts. Prefer running scripts as `.venv/bin/python script.py` over activating virtual environment and then running plain `python` command.
+## Environment & Execution
+Always use the virtual environment's Python when running scripts.
 
-## Git Workflow 
-Commit all changes with a good message. For git push operations, provide manual instructions rather than attempting to push directly, as GitHub authentication requires user credentials. You do not have access to git origin.
+Prefer running scripts via absolute or relative paths (e.g., .venv/bin/python script.py) rather than activating the virtual environment first.
 
-## CrewAI/Groq/Z.AI
-When working with CrewAI and any LLM, validate tool schemas early and test with a simple agent before expanding to multi-agent workflows.
+## Git Workflow
+Commit all changes with clear, descriptive commit messages.
 
-## Run policies
-Policy: Always run md-converter skill after any task that updates hn_daily.md.
+No Remote Pushes: You do not have write access to the git remote. Do not attempt to git push. Instead, provide manual instructions for the user to push after a successful commit.
 
-### Skill: Verified Citations
-Whenever extracting sentiment or summaries, always require the agent to provide the direct source URL for any 'representative' example. Never allow the agent to 'search' for a link after the fact.
+## AI & Agent Architecture (CrewAI/Z.ai/Groq)
+Validate tool schemas early.
+
+Always test with a simple, single agent before expanding to multi-agent workflows.
