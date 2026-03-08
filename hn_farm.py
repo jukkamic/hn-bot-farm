@@ -117,6 +117,23 @@ def strip_html(text: str) -> str:
     return text
 
 
+def escape_markdown(text: str) -> str:
+    """Escape Markdown special characters to prevent injection.
+
+    Args:
+        text: Input text potentially containing Markdown syntax
+
+    Returns:
+        Text with Markdown special characters escaped
+    """
+    if not text:
+        return ""
+    # Escape characters that could break Markdown formatting or inject links
+    for char in ['[', ']', '(', ')']:
+        text = text.replace(char, f'\\{char}')
+    return text
+
+
 # --- LLM Provider Configuration ---
 providers = {
     "zai": {
@@ -367,9 +384,15 @@ edit_task = Task(
         "- lead_quote: {comment_id, text}\n"
         "- notable_comments: [{comment_id, quote_snippet, context}]\n\n"
 
+        "SECURITY - Markdown Escaping:\n"
+        "Before embedding quote text in Markdown links, escape special characters:\n"
+        "- Replace '[' with '\\\\[' and ']' with '\\\\]'\n"
+        "- Replace '(' with '\\\\(' and ')' with '\\\\)'\n"
+        "This prevents Markdown injection from comment text.\n\n"
+
         "LINK FORMATTING:\n"
         "1. Lead Quote (always first, as blockquote):\n"
-        "   > \"[lead_quote.text](https://news.ycombinator.com/item?id=lead_quote.comment_id)\"\n\n"
+        "   > \"[escaped_lead_quote.text](https://news.ycombinator.com/item?id=lead_quote.comment_id)\"\n\n"
 
         "2. Notable Comments (string replacement in reasoning):\n"
         "   - Find each quote_snippet in vibe_reasoning\n"
@@ -382,7 +405,7 @@ edit_task = Task(
         "   [vibe_reasoning with notable comment links embedded]\n\n"
 
         f"Create a file at 'output/hn_daily.md' with:\n"
-        f"- Header: 'Hacker News Daily Digest - {datetime.now().strftime('%A %B %d, %Y')}'\n"
+        f"- Header: 'Hacker News Daily Digest - {{DATE}}'\n"
         "- Brief intro\n"
         "- Numbered list of stories\n"
         "- Closing section\n\n"
@@ -405,6 +428,10 @@ crew = Crew(
 
 def main():
     """Run the CrewAI application."""
+    # Compute date at execution time, not import time (P1-013)
+    current_date = datetime.now().strftime('%A %B %d, %Y')
+    edit_task.description = edit_task.description.replace("{DATE}", current_date)
+
     result = crew.kickoff()
     print("\n" + "=" * 60)
     print("Crew Execution Complete!")
