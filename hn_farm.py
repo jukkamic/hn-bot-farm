@@ -149,15 +149,29 @@ providers = {
     }
 }
 
-active_provider = providers["zai"]
+# Select provider from environment variable (023)
+provider_name = os.getenv("LLM_PROVIDER", "zai")
+if provider_name not in providers:
+    raise ValueError(
+        f"Unknown LLM provider: '{provider_name}'. "
+        f"Available providers: {list(providers.keys())}"
+    )
+active_provider = providers[provider_name]
 
-# CrewAI/LiteLLM standard environment setup
-# Note: CrewAI's LLM class requires these env vars for OpenAI-compatible APIs
-os.environ["OPENAI_API_KEY"] = active_provider["api_key"]
-os.environ["OPENAI_API_BASE"] = active_provider["base_url"]
+# Validate API key for active provider (024)
+if not active_provider.get("api_key"):
+    raise ValueError(
+        f"Missing API key for provider '{provider_name}'. "
+        f"Set the {provider_name.upper()}_API_KEY environment variable."
+    )
 
 # Create the LLM instance that your Agents will use
-llm = LLM(model=active_provider["model"])
+# Pass credentials directly to avoid exposing them as environment variables
+llm = LLM(
+    model=active_provider["model"],
+    api_key=active_provider["api_key"],
+    base_url=active_provider["base_url"]
+)
 
 
 # --- Custom Tool with explicit schema (fixes Groq compatibility) ---

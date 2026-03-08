@@ -27,7 +27,10 @@
       "Bash(source /workspaces/hn-bot-farm/.venv/bin/activate && python -m utils.test_converter)",
       "Bash(source /workspaces/hn-bot-farm/.venv/bin/activate && python /workspaces/hn-bot-farm/utils/test_converter.py)",
       "Bash(source .venv/bin/activate && python -c \"from utils.md_converter import convert_markdown_to_html; print\\(convert_markdown_to_html\\('# Test'\\)[:100]\\)\")",
-      "Bash(ls -la docs/plans/*analysis*lead*quote*.md 2>/dev/null)"
+      "Bash(ls -la docs/plans/*analysis*lead*quote*.md 2>/dev/null)",
+      "Bash(ls todos/*.md | wc -l && ls todos/*.md | sort -t'-' -k1 -n | tail -3)",
+      "Bash(.venv/bin/python -m py_compile hn_farm.py && echo \"Syntax OK\")",
+      "Bash(git add hn_farm.py todos/013-completed-p1-stale-timestamp-bug.md todos/014-completed-p1-markdown-injection-vulnerability.md && git status)"
     ],
     "deny": [
       "Read(.env*)",
