@@ -24,8 +24,3 @@ Managing a continuous data feed with AI introduces unique failure modes that do 
 * **Choosing the Right Tool for the Layer:** Using `jq` for the initial data slice proved that you shouldn't use an LLM (or even a Python script) for something a native Unix utility can do 100x faster. AI is reserved purely for the final, high-value cognitive processing.
 * **Infrastructure Bloat Control:** High-frequency polling generates massive log files and container fatigue. The architecture required explicit governance over container lifecycles to prevent the host OS from running out of space.
 
-## 4. Role in the Portfolio: The Intelligence Architect
-
-This project demonstrates to CTOs that I understand the economics of AI.
-
-It proves that I do not just throw an expensive LLM at every problem. Instead, I build efficient, multi-stage pipelines where cheap, fast tools (`jq`, Python) handle the heavy lifting, and the AI is deployed surgically for maximum ROI. It showcases the ability to design resilient, containerized intelligence systems that operate autonomously without requiring constant human intervention.
